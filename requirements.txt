@@ -1,0 +1,14 @@
+# --- Core Application Framework ---
+flask
+
+# --- Machine Learning & Computer Vision ---
+# For face detection and recognition.
+# For GPU support, uninstall onnxruntime and install onnxruntime-gpu
+# matching your CUDA version.
+insightface
+onnxruntime
+scikit-learn
+
+# --- Image & Data Handling ---
+opencv-python-headless
+numpy

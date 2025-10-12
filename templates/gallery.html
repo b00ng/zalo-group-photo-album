@@ -1,0 +1,84 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Review and Name Albums</title>
+    <link rel="stylesheet" href="/static/style.css">
+</head>
+<body>
+    <div class="gallery-container">
+        <div class="header">
+            <h1>Review & Organize Albums</h1>
+            <p>The faces have been automatically grouped. Review the groups, give them names, and then save the final albums.</p>
+            <button id="save-albums-btn" onclick="saveAlbums()">Save Final Albums</button>
+        </div>
+
+        <div id="cluster-grid">
+            {% for cluster in clusters %}
+            <div class="cluster-card" data-cluster-id="{{ cluster.cluster_id }}">
+                <div class="cluster-header">
+                    <input type="text" class="cluster-name-input" value="{{ cluster.name }}">
+                    <span class="face-count">({{ cluster.faces|length }} faces)</span>
+                </div>
+                <div class="faces-grid">
+                    {% for face in cluster.faces %}
+                    <img src="{{ face.face_image_url }}" alt="Face {{ face.face_id }}" title="Face ID: {{ face.face_id }}">
+                    {% endfor %}
+                </div>
+            </div>
+            {% endfor %}
+        </div>
+    </div>
+
+    <script>
+    async function saveAlbums() {
+        console.log("Collecting cluster data to save...");
+        const finalClusters = [];
+        document.querySelectorAll('.cluster-card').forEach(card => {
+            const clusterId = parseInt(card.dataset.clusterId, 10);
+            const clusterName = card.querySelector('.cluster-name-input').value;
+            const faces = [];
+            card.querySelectorAll('.faces-grid img').forEach(img => {
+                const faceId = parseInt(img.title.split(': ')[1], 10);
+                faces.push({ face_id: faceId });
+            });
+
+            finalClusters.push({
+                cluster_id: clusterId,
+                name: clusterName,
+                faces: faces
+            });
+        });
+
+        const button = document.getElementById('save-albums-btn');
+        button.textContent = 'Saving...';
+        button.disabled = true;
+
+        try {
+            const response = await fetch('/save_albums', {
+                method: 'POST',
+                headers: {
+                    'Content-Type': 'application/json',
+                },
+                body: JSON.stringify({ clusters: finalClusters }),
+            });
+
+            const result = await response.json();
+
+            if (response.ok) {
+                alert('Albums saved successfully!');
+                button.textContent = 'Saved!';
+            } else {
+                throw new Error(result.message || 'An unknown error occurred.');
+            }
+        } catch (error) {
+            console.error('Error saving albums:', error);
+            alert('Error saving albums: ' + error.message);
+            button.textContent = 'Save Final Albums';
+            button.disabled = false;
+        }
+    }
+    </script>
+</body>
+</html>

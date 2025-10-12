@@ -1,0 +1,30 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Photo Album Creator</title>
+    <link rel="stylesheet" href="/static/style.css">
+</head>
+<body>
+    <div class="container">
+        <h1>Photo Album Creator</h1>
+        <div class="nav-links">
+            <a href="/" class="active">Cluster Discovery</a>
+            <a href="/search">Search for Person</a>
+        </div>
+        <p><strong>Cluster Discovery Mode:</strong> Enter a folder path below. The application will automatically find all people in the folder and create a review gallery for you to name and save albums.</p>
+        
+        <form action="/process" method="post">
+            <label for="folder_path">Photo Folder Path:</label>
+            <input type="text" id="folder_path" name="folder_path" required placeholder="e.g., /home/user/pictures/vacation">
+            <button type="submit">Create Albums</button>
+        </form>
+
+        <div class="status">
+            <h2>Processing Status</h2>
+            <pre id="status-log">{{ status_message | safe }}</pre>
+        </div>
+    </div>
+</body>
+</html>
