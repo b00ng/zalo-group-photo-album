@@ -8,7 +8,23 @@
 </head>
 <body>
     <div class="container">
-        <a href="/" class="back-link">&larr; Back to Cluster Discovery</a>
+        {% if google_user %}
+        <div class="user-bar">
+            {% if google_user.picture %}
+            <img src="{{ google_user.picture }}" alt="{{ google_user.name }}'s avatar" class="user-avatar">
+            {% endif %}
+            <div class="user-details">
+                <span class="user-name">{{ google_user.name }}</span>
+                <span class="user-email">{{ google_user.email }}</span>
+            </div>
+            <a href="{{ url_for('logout') }}" class="sign-out-link">Sign out</a>
+        </div>
+        {% endif %}
+        <div class="nav-links">
+            <a href="/">Cluster Discovery</a>
+            <a href="/search" class="active">Search for Person</a>
+            <a href="/timeline">Person Timelines</a>
+        </div>
         <h1>Search for a Specific Person</h1>
         <p>Upload one or more sample photos of a person, provide a directory to search in, and create a dedicated album for them.</p>
         

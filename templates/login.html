@@ -1,0 +1,27 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Sign in with Google</title>
+    <link rel="stylesheet" href="/static/style.css">
+</head>
+<body>
+    <div class="container auth-container">
+        <h1>Sign in to Continue</h1>
+        <p>You must sign in with your Google account to organize or search photos.</p>
+
+        {% if error_message %}
+        <div class="status error">
+            <h2>Sign-in Issue</h2>
+            <p>{{ error_message }}</p>
+        </div>
+        {% endif %}
+
+        <a class="google-login-button" href="{{ url_for('auth_google') }}">
+            <img src="https://www.gstatic.com/firebasejs/ui/2.0.0/images/auth/google.svg" alt="" aria-hidden="true">
+            <span>Continue with Google</span>
+        </a>
+    </div>
+</body>
+</html>

@@ -8,6 +8,23 @@
 </head>
 <body>
     <div class="gallery-container">
+        {% if google_user %}
+        <div class="user-bar">
+            {% if google_user.picture %}
+            <img src="{{ google_user.picture }}" alt="{{ google_user.name }}'s avatar" class="user-avatar">
+            {% endif %}
+            <div class="user-details">
+                <span class="user-name">{{ google_user.name }}</span>
+                <span class="user-email">{{ google_user.email }}</span>
+            </div>
+            <a href="{{ url_for('logout') }}" class="sign-out-link">Sign out</a>
+        </div>
+        {% endif %}
+        <div class="nav-links">
+            <a href="/">Cluster Discovery</a>
+            <a href="/search">Search for Person</a>
+            <a href="/timeline">Person Timelines</a>
+        </div>
         <div class="header">
             <h1>Review & Organize Albums</h1>
             <p>The faces have been automatically grouped. Review the groups, give them names, and then save the final albums.</p>
@@ -20,6 +37,9 @@
                 <div class="cluster-header">
                     <input type="text" class="cluster-name-input" value="{{ cluster.name }}">
                     <span class="face-count">({{ cluster.faces|length }} faces)</span>
+                </div>
+                <div class="cluster-actions">
+                    <a class="timeline-link" href="{{ url_for('timeline_detail', cluster_id=cluster.cluster_id) }}">View timeline</a>
                 </div>
                 <div class="faces-grid">
                     {% for face in cluster.faces %}

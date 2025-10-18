@@ -1,0 +1,78 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>{{ cluster.name }} Timeline</title>
+    <link rel="stylesheet" href="/static/style.css">
+</head>
+<body>
+    <div class="container timeline-detail-container">
+        {% if google_user %}
+        <div class="user-bar">
+            {% if google_user.picture %}
+            <img src="{{ google_user.picture }}" alt="{{ google_user.name }}'s avatar" class="user-avatar">
+            {% endif %}
+            <div class="user-details">
+                <span class="user-name">{{ google_user.name }}</span>
+                <span class="user-email">{{ google_user.email }}</span>
+            </div>
+            <a href="{{ url_for('logout') }}" class="sign-out-link">Sign out</a>
+        </div>
+        {% endif %}
+        <div class="nav-links">
+            <a href="/">Cluster Discovery</a>
+            <a href="/search">Search for Person</a>
+            <a href="/timeline" class="active">Person Timelines</a>
+        </div>
+
+        <a href="{{ url_for('timeline_index') }}" class="back-link">&larr; Back to all timelines</a>
+        <h1>{{ cluster.name }}</h1>
+
+        {% if photo_count %}
+        <div class="timeline-summary">
+            <span class="summary-count">{{ photo_count }} photo{{ photo_count != 1 and 's' or '' }}</span>
+            {% if date_range %}
+                {% if date_range.end %}
+                <span class="summary-dates">{{ date_range.start }} – {{ date_range.end }}</span>
+                {% else %}
+                <span class="summary-dates">{{ date_range.start }}</span>
+                {% endif %}
+            {% else %}
+            <span class="summary-dates">Dates unavailable</span>
+            {% endif %}
+        </div>
+        {% else %}
+        <div class="status">
+            <h2>No photos available</h2>
+            <p>This timeline does not have any photos yet. Run clustering or update assignments, then refresh.</p>
+        </div>
+        {% endif %}
+
+        {% if timeline_groups %}
+            {% for group in timeline_groups %}
+            <section class="timeline-day">
+                <h2>{{ group.day_label }}</h2>
+                <div class="timeline-grid">
+                    {% for item in group.items %}
+                    <a class="timeline-photo" href="{{ item.original_url }}" target="_blank" rel="noopener">
+                        <img src="{{ item.thumbnail_url }}" alt="Photo for {{ cluster.name }}">
+                        <div class="timeline-meta">
+                            <span class="timeline-time">{{ item.time_label }}</span>
+                            <span class="timeline-filename">{{ item.filename }}</span>
+                            <span class="timeline-source">Source: {{ item.timestamp_source|replace('_', ' ') }}</span>
+                        </div>
+                    </a>
+                    {% endfor %}
+                </div>
+            </section>
+            {% endfor %}
+        {% else %}
+        <div class="status">
+            <h2>No timeline entries</h2>
+            <p>The system could not determine timestamps for this person. Photos are still accessible from the review gallery and exported albums.</p>
+        </div>
+        {% endif %}
+    </div>
+</body>
+</html>

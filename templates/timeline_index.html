@@ -1,0 +1,50 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Person Timelines</title>
+    <link rel="stylesheet" href="/static/style.css">
+</head>
+<body>
+    <div class="container">
+        {% if google_user %}
+        <div class="user-bar">
+            {% if google_user.picture %}
+            <img src="{{ google_user.picture }}" alt="{{ google_user.name }}'s avatar" class="user-avatar">
+            {% endif %}
+            <div class="user-details">
+                <span class="user-name">{{ google_user.name }}</span>
+                <span class="user-email">{{ google_user.email }}</span>
+            </div>
+            <a href="{{ url_for('logout') }}" class="sign-out-link">Sign out</a>
+        </div>
+        {% endif %}
+        <div class="nav-links">
+            <a href="/">Cluster Discovery</a>
+            <a href="/search">Search for Person</a>
+            <a href="/timeline" class="active">Person Timelines</a>
+        </div>
+
+        <h1>Person Timelines</h1>
+        <p>Explore each person's photos in chronological order. Timelines appear after a clustering run has been completed.</p>
+
+        {% if has_data %}
+        <div class="timeline-list">
+            {% for cluster in clusters %}
+            <a class="timeline-card" href="{{ url_for('timeline_detail', cluster_id=cluster.cluster_id) }}">
+                <h2>{{ cluster.name }}</h2>
+                <p>{{ cluster.photo_count }} photo{{ cluster.photo_count != 1 and 's' or '' }}</p>
+                <span class="timeline-card-meta">{{ cluster.face_count }} face{{ cluster.face_count != 1 and 's' or '' }}</span>
+            </a>
+            {% endfor %}
+        </div>
+        {% else %}
+        <div class="status">
+            <h2>No Timelines Available</h2>
+            <p>Run a clustering session to generate person timelines, then return to this page.</p>
+        </div>
+        {% endif %}
+    </div>
+</body>
+</html>

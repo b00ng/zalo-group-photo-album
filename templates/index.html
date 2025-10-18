@@ -8,10 +8,23 @@
 </head>
 <body>
     <div class="container">
+        {% if google_user %}
+        <div class="user-bar">
+            {% if google_user.picture %}
+            <img src="{{ google_user.picture }}" alt="{{ google_user.name }}'s avatar" class="user-avatar">
+            {% endif %}
+            <div class="user-details">
+                <span class="user-name">{{ google_user.name }}</span>
+                <span class="user-email">{{ google_user.email }}</span>
+            </div>
+            <a href="{{ url_for('logout') }}" class="sign-out-link">Sign out</a>
+        </div>
+        {% endif %}
         <h1>Photo Album Creator</h1>
         <div class="nav-links">
             <a href="/" class="active">Cluster Discovery</a>
             <a href="/search">Search for Person</a>
+            <a href="/timeline">Person Timelines</a>
         </div>
         <p><strong>Cluster Discovery Mode:</strong> Enter a folder path below. The application will automatically find all people in the folder and create a review gallery for you to name and save albums.</p>
         

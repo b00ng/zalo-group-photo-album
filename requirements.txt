@@ -1,6 +1,14 @@
 # --- Core Application Framework ---
 flask
 
+# --- Authentication ---
+google-auth
+google-auth-oauthlib
+requests
+
+# --- Media Metadata ---
+Pillow
+
 # --- Machine Learning & Computer Vision ---
 # For face detection and recognition.
 # For GPU support, uninstall onnxruntime and install onnxruntime-gpu
