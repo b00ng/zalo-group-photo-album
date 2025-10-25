@@ -11,6 +11,23 @@ This is an intelligent photo assistant that automatically organizes your photos 
 - **Cross-Platform:** Works on Windows 11, macOS, and Ubuntu.
 - **CPU & GPU Support:** Runs on standard laptops (CPU) and can leverage NVIDIA GPUs for significantly faster processing.
 
+## Main Features (In Depth)
+
+- Optional Google sign-in lets teams attach identity when credentials are present while keeping albums available anonymously; session details surface in the header and login UX adjusts accordingly (`app.py:52`, `app.py:143`, `templates/index.html:28`, `templates/login.html:11`).
+- Automated “Cluster Discovery” detects faces with InsightFace, clusters embeddings with DBSCAN, and shows a review gallery the user can rename before export (`app.py:224`, `photo_processor.py:86`, `photo_processor.py:166`, `templates/gallery.html:34`).
+- Album export copies original photos into per-person folders after the user saves their edits, keeping cluster metadata in sync for later sessions (`app.py:249`, `photo_processor.py:256`, `photo_processor.py:223`).
+- Targeted “Search for Person” mode averages embeddings from uploaded samples, scans another directory for close matches, and builds a dedicated album (`app.py:173`, `photo_processor.py:280`, `templates/search.html:31`).
+- Person timelines reuse cached cluster data to render chronological galleries and serve original photos only from whitelisted roots to prevent path traversal (`app.py:295`, `app.py:327`, `app.py:474`, `templates/timeline_index.html:32`).
+
+## System Flow Overview
+
+- App startup enables optional Google OAuth, prints a warning when credentials are missing, loads the InsightFace model once, and prepares an `output_albums/.cache` workspace for embeddings, crops, and assignments (`app.py:34`, `app.py:52`, `app.py:153`, `photo_processor.py:20`).
+- Anonymous visitors can use every feature immediately; when Google sign-in is configured, successful callbacks stash profile details in the session and resume the original request (`app.py:173`, `app.py:506`, `app.py:576`, `templates/login.html:11`).
+- In cluster discovery, the user submits a photo directory; the server extracts faces, stores crops and embeddings, computes clusters, and returns structured cluster data for the gallery UI (`app.py:224`, `photo_processor.py:86`, `photo_processor.py:148`, `photo_processor.py:180`).
+- The gallery page lets users rename clusters and confirm; the front-end posts the edited clusters back to `/save_albums`, which copies originals into friendly-named folders and updates cached assignments for future timeline views (`templates/gallery.html:28`, `app.py:249`, `photo_processor.py:256`, `photo_processor.py:223`).
+- The separate search workflow temporarily saves uploaded samples, logs progress to the page, compares embeddings across the target folder, and copies matches into a new album before cleaning its temp files (`app.py:173`, `app.py:205`, `photo_processor.py:280`).
+- Timeline pages read cached assignments and face metadata, group photos by day using stored timestamps, and provide secure links to the original images while blocking requests that escape approved directories (`app.py:295`, `app.py:327`, `app.py:474`, `templates/timeline_detail.html:54`).
+
 ---
 
 ## Installation Guide
@@ -51,16 +68,16 @@ You must have Anaconda or Miniconda installed on your system.
     ```
     This will download and install all necessary packages, including Flask, scikit-learn, and InsightFace.
 
-### Authentication Setup
+### Optional Google Sign-In
 
-Google Sign-In is required before you can use the clustering or search tools.
+Google OAuth is optional. Configure it when you want users to identify themselves; otherwise the app runs anonymously.
 
-1. **Create Google OAuth Credentials:**  
+1. **(Optional) Create Google OAuth Credentials:**  
    - Visit the [Google Cloud Console](https://console.cloud.google.com/apis/credentials).
    - Create an OAuth 2.0 Client ID of type **Web application**.
    - Add authorized redirect URIs, including `http://localhost:8080/auth/google/callback` for local development.
-2. **Configure Environment Variables:**  
-   The server refuses to start if any of these are missing.
+2. **(Optional) Configure Environment Variables:**  
+   When all variables are present, the app enables the Google sign-in experience. Missing values simply disable the login button.
    ```bash
    export GOOGLE_CLIENT_ID="your-client-id.apps.googleusercontent.com"
    export GOOGLE_CLIENT_SECRET="your-secret"
@@ -68,7 +85,7 @@ Google Sign-In is required before you can use the clustering or search tools.
    export FLASK_SECRET_KEY="set-a-random-secret"
    ```
 3. **Restart the Server:**  
-   Restart any running Flask process after updating the environment variables so the changes take effect.
+   Restart any running Flask process after updating the environment variables so the changes take effect. Without credentials, the server logs a warning that Google sign-in is disabled and continues to run.
 
 ### (Optional) GPU Acceleration Setup
 
@@ -114,7 +131,7 @@ For a significant performance increase, you can configure the application to use
 
 The application has two main modes, accessible from the navigation bar at the top of the page.
 
-You must sign in with a Google account before you can access either mode. The signed-in account is displayed in the upper-right corner with a sign-out action.
+Signing in with a Google account is optional. When enabled and authenticated, the signed-in account is displayed in the upper-right corner with a sign-out action.
 
 #### Feature A: Cluster Discovery (Automatic Grouping)
 
@@ -151,14 +168,14 @@ After running clustering, open **Person Timelines** from the navigation bar to b
 
 ## Manual Verification Checklist
 
-Use Google test credentials (or a dedicated workspace test account) to verify the authentication flow:
+Use Google test credentials (or a dedicated workspace test account) to verify the optional authentication flow:
 
-1. **Anonymous Access Redirects:** Visit `http://localhost:8080/` in a private browser window and confirm you are redirected to the sign-in page.
-2. **Successful Sign-In:** Click **Continue with Google**, complete the OAuth consent screen, and verify that the home page loads with your Google name/avatar in the header.
-3. **Protected POST Endpoints:** Attempt to call `POST /save_albums` using the browser dev tools or `curl` without a session and confirm the response is HTTP 401 with a JSON error.
-4. **State Mismatch Handling:** Start the login flow, then manually remove the `state` parameter from the callback URL before submitting. Confirm you return to the login page with an error message.
-5. **Sign-Out:** Click **Sign out** and confirm you are returned to the login screen, and subsequent navigation requires signing in again.
-6. **EXIF Timestamp Extraction:** Upload a photo with a known EXIF `DateTimeOriginal` value and confirm the person’s timeline groups the image under the expected day and shows the correct time.
-7. **Filesystem Fallback:** Upload a photo without EXIF metadata and ensure the timeline still lists it (labelled with the fallback timestamp source).
-8. **Timeline Auth Protection:** Attempt to visit `/timeline` or `/timeline/<id>` in a private browser session and verify you are redirected to the login page.
+1. **Startup Without Credentials:** Launch the server without Google OAuth environment variables and confirm it logs a warning but still serves the app.
+2. **Anonymous Access Works:** Visit `http://localhost:8080/` in a private browser window and verify you stay on the main page with an optional “Sign in with Google” link when OAuth is configured.
+3. **Anonymous Timeline Access:** Navigate to `/timeline` and `/timeline/<id>` without signing in to confirm the pages load normally.
+4. **Successful Sign-In (Optional):** After providing credentials, click **Continue with Google**, complete the OAuth consent screen, and verify that the home page shows your Google name/avatar in the header.
+5. **State Mismatch Handling:** Start the login flow, then manually remove the `state` parameter from the callback URL before submitting. Confirm you return to the login page with an error message.
+6. **Sign-Out:** Click **Sign out** and confirm you return to the login page (when enabled) or the main page (when login is disabled) and the header no longer shows account info.
+7. **EXIF Timestamp Extraction:** Upload a photo with a known EXIF `DateTimeOriginal` value and confirm the person’s timeline groups the image under the expected day and shows the correct time.
+8. **Filesystem Fallback:** Upload a photo without EXIF metadata and ensure the timeline still lists it (labelled with the fallback timestamp source).
 9. **Secure Photo Serving:** Copy a timeline photo link, edit the URL to target a disallowed path, and confirm the server responds with HTTP 403.

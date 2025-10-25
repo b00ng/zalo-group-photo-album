@@ -24,6 +24,9 @@
             <a href="/">Cluster Discovery</a>
             <a href="/search" class="active">Search for Person</a>
             <a href="/timeline">Person Timelines</a>
+            {% if google_auth_enabled and not is_authenticated %}
+            <a href="{{ url_for('login', next=request.path) }}">Sign in with Google</a>
+            {% endif %}
         </div>
         <h1>Search for a Specific Person</h1>
         <p>Upload one or more sample photos of a person, provide a directory to search in, and create a dedicated album for them.</p>

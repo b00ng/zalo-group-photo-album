@@ -49,11 +49,12 @@ missing_google_config = [
     if not value
 ]
 
-if missing_google_config:
+GOOGLE_AUTH_ENABLED = not missing_google_config
+if not GOOGLE_AUTH_ENABLED:
     missing_csv = ", ".join(missing_google_config)
-    raise RuntimeError(
-        f"Missing required Google OAuth configuration: {missing_csv}. "
-        "Set the environment variables before starting the app."
+    print(
+        "Warning: Google sign-in disabled; missing configuration values: "
+        f"{missing_csv}. Users may continue without authentication."
     )
 
 AUTH_SCOPES = ["openid", "email", "profile"]
@@ -61,6 +62,8 @@ AUTH_SCOPES = ["openid", "email", "profile"]
 
 def _build_flow():
     """Construct a Google OAuth flow instance with project credentials."""
+    if not GOOGLE_AUTH_ENABLED:
+        raise RuntimeError("Google OAuth flow requested but configuration is missing.")
     return Flow.from_client_config(
         {
             "web": {
@@ -143,6 +146,7 @@ def inject_user():
     return {
         "google_user": session.get("google_user"),
         "is_authenticated": session.get("is_authenticated", False),
+        "google_auth_enabled": GOOGLE_AUTH_ENABLED,
     }
 
 
@@ -155,21 +159,18 @@ print("Model loaded successfully.")
 
 # --- ROUTES ---
 @app.route("/")
-@login_required
 def index():
     """Serves the main page where the user provides the input folder."""
     return render_template("index.html")
 
 
 @app.route("/search")
-@login_required
 def search():
     """Serves the new page for searching for a specific person."""
     return render_template("search.html")
 
 
 @app.route("/run_search", methods=["POST"])
-@login_required
 def run_search():
     """Handles the search form submission."""
     sample_files = request.files.getlist("sample_files")
@@ -221,7 +222,6 @@ def run_search():
 
 
 @app.route("/process", methods=["POST"])
-@login_required
 def process():
     """
     Handles the initial processing request for cluster discovery.
@@ -247,7 +247,6 @@ def process():
 
 
 @app.route("/save_albums", methods=["POST"])
-@login_required(json_response=True)
 def save_albums():
     """
     Receives the corrected cluster data from the UI and saves the final albums.
@@ -288,14 +287,12 @@ def save_albums():
 
 
 @app.route("/output_albums/.cache/faces/<path:filename>")
-@login_required
 def serve_cached_faces(filename):
     """Serves the cropped face images from the cache directory."""
     return send_from_directory(processor.faces_cache_path, filename)
 
 
 @app.route("/timeline")
-@login_required
 def timeline_index():
     """List available clusters and provide entry points into their timelines."""
     assignments = processor.load_cluster_assignments()
@@ -328,7 +325,6 @@ def timeline_index():
 
 
 @app.route("/timeline/<int:cluster_id>")
-@login_required
 def timeline_detail(cluster_id):
     """Render a chronological gallery for a single cluster/person."""
     assignments = processor.load_cluster_assignments()
@@ -476,7 +472,6 @@ def timeline_detail(cluster_id):
 
 
 @app.route("/timeline/photo/<int:face_id>")
-@login_required
 def serve_original_photo(face_id):
     """Serve the original photo for a face if it resides in an allowed directory."""
     faces_data = processor.load_all_faces_data()
@@ -522,12 +517,19 @@ def login():
         session["post_login_redirect"] = next_param
 
     error_message = session.pop("auth_error", None)
-    return render_template("login.html", error_message=error_message)
+    return render_template(
+        "login.html",
+        error_message=error_message,
+        google_auth_available=GOOGLE_AUTH_ENABLED,
+    )
 
 
 @app.route("/auth/google")
 def auth_google():
     """Begin the Google OAuth flow."""
+    if not GOOGLE_AUTH_ENABLED:
+        abort(404)
+
     if session.get("is_authenticated"):
         return redirect(url_for("index"))
 
@@ -546,6 +548,9 @@ def auth_google():
 @app.route("/auth/google/callback")
 def auth_google_callback():
     """Handle the Google OAuth callback and establish a session."""
+    if not GOOGLE_AUTH_ENABLED:
+        abort(404)
+
     state = request.args.get("state")
     expected_state = session.get("oauth_state")
     if not state or state != expected_state:
@@ -588,7 +593,9 @@ def auth_google_callback():
 def logout():
     """Clear the current session."""
     session.clear()
-    return redirect(url_for("login"))
+    if GOOGLE_AUTH_ENABLED:
+        return redirect(url_for("login"))
+    return redirect(url_for("index"))
 
 
 # --- MAIN ---

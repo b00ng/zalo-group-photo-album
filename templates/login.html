@@ -8,8 +8,9 @@
 </head>
 <body>
     <div class="container auth-container">
-        <h1>Sign in to Continue</h1>
-        <p>You must sign in with your Google account to organize or search photos.</p>
+        {% if google_auth_available %}
+        <h1>Sign in with Google</h1>
+        <p>Signing in is optional and lets you keep track of who is using the app.</p>
 
         {% if error_message %}
         <div class="status error">
@@ -22,6 +23,12 @@
             <img src="https://www.gstatic.com/firebasejs/ui/2.0.0/images/auth/google.svg" alt="" aria-hidden="true">
             <span>Continue with Google</span>
         </a>
+        {% else %}
+        <h1>Google Sign-in Unavailable</h1>
+        <p>This server is not configured for Google OAuth, but you can continue using the app without signing in.</p>
+        {% endif %}
+
+        <p><a href="{{ url_for('index') }}" class="back-link">&larr; Return to the app</a></p>
     </div>
 </body>
 </html>

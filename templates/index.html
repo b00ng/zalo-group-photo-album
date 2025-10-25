@@ -25,6 +25,9 @@
             <a href="/" class="active">Cluster Discovery</a>
             <a href="/search">Search for Person</a>
             <a href="/timeline">Person Timelines</a>
+            {% if google_auth_enabled and not is_authenticated %}
+            <a href="{{ url_for('login', next=request.path) }}">Sign in with Google</a>
+            {% endif %}
         </div>
         <p><strong>Cluster Discovery Mode:</strong> Enter a folder path below. The application will automatically find all people in the folder and create a review gallery for you to name and save albums.</p>
         
