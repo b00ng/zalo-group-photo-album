@@ -174,6 +174,39 @@ Use this when you already have cropped faces and `all_faces_data.json` from a pr
 3. Optionally set a custom output folder name plus clustering similarity or minimum samples; leave blank to reuse the defaults (0.5 and 2).
 4. Click **"Group Faces"** to cluster the cached embeddings and copy the referenced photos into per-person subfolders under `output_albums/<chosen-or-generated-name>/`.
 
+#### Run Cluster Discovery from the Command Line
+
+You can execute the entire extraction → clustering → album export pipeline without starting Flask. This is useful for automated jobs or remote servers.
+
+1. **Install dependencies** (inside a virtual environment if you prefer):
+   ```bash
+   python3 -m venv .venv
+   source .venv/bin/activate
+   pip install -r requirements.txt
+   ```
+2. **Run the pipeline with Python** (replace the paths and tuning parameters as needed):
+   ```bash
+   python - <<'PY'
+   from photo_processor import PhotoProcessor
+
+   photos_dir = "/absolute/path/to/photos"
+   output_dir = "output_albums_cli"
+
+   processor = PhotoProcessor(output_path_base=output_dir)
+   faces = processor.extract_faces(photos_dir)
+   if not faces:
+       raise SystemExit("No faces detected; nothing to cluster.")
+
+   labels = processor.cluster_faces(faces, eps=0.5, min_samples=2)
+   clusters = processor.generate_cluster_ui_data(faces, labels)
+   PhotoProcessor.save_final_albums(clusters, faces, output_dir)
+
+   print(f"Created grouped albums in: {output_dir}")
+   PY
+   ```
+3. **Customize clustering behaviour** by editing the `eps` (similarity threshold) and `min_samples` arguments before rerunning the script.
+4. **Review the results**: grouped folders will appear under `output_dir`, each containing the original photos for that cluster. Cached face crops and metadata live in `output_dir/.cache/`.
+
 ---
 
 ## Manual Verification Checklist
@@ -191,3 +224,4 @@ Use Google test credentials (or a dedicated workspace test account) to verify th
 9. **Secure Photo Serving:** Copy a timeline photo link, edit the URL to target a disallowed path, and confirm the server responds with HTTP 403.
 10. **Reuse Cached Faces (Success):** Point the Group Existing Faces flow at a photo directory and matching cache (containing `all_faces_data.json`) and confirm grouped albums plus the success summary are created.
 11. **Reuse Cached Faces (Validation):** Run the flow with a cache missing `all_faces_data.json` or referencing files outside the supplied photo directory and ensure a clear error is displayed without creating output.
+12. **CLI Cluster Discovery:** Execute the command-line workflow using a sample album, adjust `eps`/`min_samples`, and confirm grouped folders and cache artifacts are written to the specified output directory.
