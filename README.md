@@ -138,10 +138,11 @@ Signing in with a Google account is optional. When enabled and authenticated, th
 This is the default mode. It's best for when you have a folder of photos and you want to discover everyone in it.
 
 1.  On the "Cluster Discovery" page, enter the **full, absolute path** to the folder containing your photos.
-2.  Click **"Create Albums"**.
-3.  The application will process all the photos. When it's done, you will be redirected to the **Review Gallery**.
-4.  In the gallery, you can see all the groups of faces the app found. **Rename the albums** by typing in the text boxes (e.g., change "Person 1" to "John Doe").
-5.  Once you are happy with the names, click the **"Save Final Albums"** button at the top. The final, named albums will be created in the `output_albums` directory.
+2.  Optionally adjust **Clustering Similarity (eps)** or **Minimum Samples** when you want tighter or looser grouping; leave the defaults (0.5 and 2) for behaviour that matches prior releases.
+3.  Click **"Create Albums"**.
+4.  The application will process all the photos. When it's done, you will be redirected to the **Review Gallery**.
+5.  In the gallery, you can see all the groups of faces the app found. **Rename the albums** by typing in the text boxes (e.g., change "Person 1" to "John Doe").
+6.  Once you are happy with the names, click the **"Save Final Albums"** button at the top. The final, named albums will be created in the `output_albums` directory.
 
 #### Feature B: Search for a Person
 
@@ -164,6 +165,15 @@ After running clustering, open **Person Timelines** from the navigation bar to b
 3. The header displays the total photo count and the overall date range when timestamps are available.
 4. Timelines update automatically when you re-run clustering or rename clusters in the review gallery.
 
+#### Feature D: Group Existing Faces
+
+Use this when you already have cropped faces and `all_faces_data.json` from a previous run and only need to rebuild grouped photo folders.
+
+1. Open **Group Existing Faces** from the navigation bar.
+2. Enter the original photo directory and the faces cache directory (must contain `all_faces_data.json`).
+3. Optionally set a custom output folder name plus clustering similarity or minimum samples; leave blank to reuse the defaults (0.5 and 2).
+4. Click **"Group Faces"** to cluster the cached embeddings and copy the referenced photos into per-person subfolders under `output_albums/<chosen-or-generated-name>/`.
+
 ---
 
 ## Manual Verification Checklist
@@ -179,3 +189,5 @@ Use Google test credentials (or a dedicated workspace test account) to verify th
 7. **EXIF Timestamp Extraction:** Upload a photo with a known EXIF `DateTimeOriginal` value and confirm the person’s timeline groups the image under the expected day and shows the correct time.
 8. **Filesystem Fallback:** Upload a photo without EXIF metadata and ensure the timeline still lists it (labelled with the fallback timestamp source).
 9. **Secure Photo Serving:** Copy a timeline photo link, edit the URL to target a disallowed path, and confirm the server responds with HTTP 403.
+10. **Reuse Cached Faces (Success):** Point the Group Existing Faces flow at a photo directory and matching cache (containing `all_faces_data.json`) and confirm grouped albums plus the success summary are created.
+11. **Reuse Cached Faces (Validation):** Run the flow with a cache missing `all_faces_data.json` or referencing files outside the supplied photo directory and ensure a clear error is displayed without creating output.

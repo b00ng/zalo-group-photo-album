@@ -9,6 +9,7 @@ from datetime import datetime
 from functools import wraps
 from urllib.parse import urljoin, urlparse
 
+import numpy as np
 from flask import (
     abort,
     Flask,
@@ -112,6 +113,47 @@ def _allowed_photo_roots(faces_data):
     return roots
 
 
+def _parse_cluster_parameters(eps_raw: str, min_samples_raw: str):
+    """Validate and convert clustering parameters from string form."""
+    eps_value = None
+    min_samples_value = None
+
+    if eps_raw:
+        try:
+            eps_value = float(eps_raw)
+        except ValueError:
+            return None, None, "Error: Similarity must be a number."
+        if eps_value <= 0:
+            return None, None, "Error: Similarity must be greater than 0."
+
+    if min_samples_raw:
+        try:
+            min_samples_value = int(min_samples_raw)
+        except ValueError:
+            return None, None, "Error: Minimum samples must be an integer."
+        if min_samples_value < 2:
+            return None, None, "Error: Minimum samples must be at least 2."
+
+    return eps_value, min_samples_value, None
+
+
+def _resolve_output_directory(desired_name: str):
+    """Determine a unique directory under OUTPUT_DIR for album export."""
+    sanitized = "".join(
+        c for c in (desired_name or "") if c.isalnum() or c in (" ", "_", "-")
+    ).strip()
+    if not sanitized:
+        sanitized = f"grouped_faces_{datetime.now().strftime('%Y%m%d_%H%M%S')}"
+
+    candidate = sanitized
+    counter = 1
+    while os.path.exists(os.path.join(OUTPUT_DIR, candidate)):
+        candidate = f"{sanitized}_{counter}"
+        counter += 1
+
+    return os.path.join(OUTPUT_DIR, candidate), candidate
+
+
 def login_required(view=None, *, json_response=False):
     """Gate access to authenticated users, returning JSON when requested."""
 
@@ -161,7 +203,12 @@ print("Model loaded successfully.")
 @app.route("/")
 def index():
     """Serves the main page where the user provides the input folder."""
-    return render_template("index.html")
+    return render_template(
+        "index.html",
+        form_values={},
+        default_eps=PhotoProcessor.DEFAULT_CLUSTER_EPS,
+        default_min_samples=PhotoProcessor.DEFAULT_CLUSTER_MIN_SAMPLES,
+    )
 
 
 @app.route("/search")
@@ -227,10 +274,36 @@ def process():
     Handles the initial processing request for cluster discovery.
     """
     folder_path = request.form.get("folder_path")
+    eps_raw = (request.form.get("eps") or "").strip()
+    min_samples_raw = (request.form.get("min_samples") or "").strip()
+
+    form_values = {
+        "folder_path": folder_path or "",
+        "eps": eps_raw,
+        "min_samples": min_samples_raw,
+    }
+
+    default_context = {
+        "form_values": form_values,
+        "default_eps": PhotoProcessor.DEFAULT_CLUSTER_EPS,
+        "default_min_samples": PhotoProcessor.DEFAULT_CLUSTER_MIN_SAMPLES,
+    }
+
+    eps_value, min_samples_value, param_error = _parse_cluster_parameters(
+        eps_raw, min_samples_raw
+    )
+    if param_error:
+        return render_template(
+            "index.html",
+            status_message=param_error,
+            **default_context,
+        )
 
     if not folder_path or not os.path.isdir(folder_path):
         return render_template(
-            "index.html", status_message="Error: Invalid folder path."
+            "index.html",
+            status_message="Error: Invalid folder path.",
+            **default_context,
         )
 
     all_faces = processor.extract_faces(folder_path)
@@ -238,12 +311,259 @@ def process():
         return render_template(
             "index.html",
             status_message="No faces found in the provided directory.",
+            **default_context,
         )
 
-    labels = processor.cluster_faces(all_faces)
+    labels = processor.cluster_faces(
+        all_faces, eps=eps_value, min_samples=min_samples_value
+    )
     cluster_data = processor.generate_cluster_ui_data(all_faces, labels)
 
     return render_template("gallery.html", clusters=cluster_data)
+
+
+@app.route("/reuse_faces")
+def reuse_faces():
+    """Render the form for grouping existing cached faces into albums."""
+    return render_template(
+        "reuse_faces.html",
+        form_values={},
+        status_message=None,
+        status_level=None,
+        default_eps=PhotoProcessor.DEFAULT_CLUSTER_EPS,
+        default_min_samples=PhotoProcessor.DEFAULT_CLUSTER_MIN_SAMPLES,
+    )
+
+
+@app.route("/run_reuse_faces", methods=["POST"])
+def run_reuse_faces():
+    """Process cached faces to build grouped albums without re-running detection."""
+    photos_path = request.form.get("photos_path")
+    faces_path = request.form.get("faces_path")
+    output_name_raw = (request.form.get("output_name") or "").strip()
+    eps_raw = (request.form.get("eps") or "").strip()
+    min_samples_raw = (request.form.get("min_samples") or "").strip()
+
+    form_values = {
+        "photos_path": photos_path or "",
+        "faces_path": faces_path or "",
+        "output_name": output_name_raw,
+        "eps": eps_raw,
+        "min_samples": min_samples_raw,
+    }
+    context = {
+        "form_values": form_values,
+        "default_eps": PhotoProcessor.DEFAULT_CLUSTER_EPS,
+        "default_min_samples": PhotoProcessor.DEFAULT_CLUSTER_MIN_SAMPLES,
+    }
+
+    eps_value, min_samples_value, param_error = _parse_cluster_parameters(
+        eps_raw, min_samples_raw
+    )
+    if param_error:
+        return render_template(
+            "reuse_faces.html",
+            status_message=param_error,
+            status_level="error",
+            **context,
+        )
+
+    if not photos_path or not os.path.isdir(photos_path):
+        return render_template(
+            "reuse_faces.html",
+            status_message="Error: Original photo folder not found.",
+            status_level="error",
+            **context,
+        )
+
+    if not faces_path or not os.path.isdir(faces_path):
+        return render_template(
+            "reuse_faces.html",
+            status_message="Error: Faces cache folder not found.",
+            status_level="error",
+            **context,
+        )
+
+    faces_cache_file = os.path.join(faces_path, "all_faces_data.json")
+    if not os.path.isfile(faces_cache_file):
+        return render_template(
+            "reuse_faces.html",
+            status_message="Error: Faces cache is missing all_faces_data.json.",
+            status_level="error",
+            **context,
+        )
+
+    try:
+        with open(faces_cache_file, "r") as cache_file:
+            cached_faces = json.load(cache_file)
+    except json.JSONDecodeError:
+        return render_template(
+            "reuse_faces.html",
+            status_message="Error: Faces cache metadata is not valid JSON.",
+            status_level="error",
+            **context,
+        )
+
+    if not isinstance(cached_faces, list) or not cached_faces:
+        return render_template(
+            "reuse_faces.html",
+            status_message="Error: Faces cache does not contain any faces to group.",
+            status_level="error",
+            **context,
+        )
+
+    photos_abs = os.path.abspath(photos_path)
+    missing_photos = []
+    outside_scope = []
+    missing_metadata = []
+    prepared_faces = []
+
+    for entry in cached_faces:
+        face_id = entry.get("face_id")
+        embedding = entry.get("embedding")
+        original_path = entry.get("original_path")
+
+        if face_id is None or embedding is None or original_path is None:
+            missing_metadata.append(face_id)
+            continue
+
+        original_abs = os.path.abspath(original_path)
+        if not os.path.exists(original_abs):
+            missing_photos.append(original_abs)
+            continue
+
+        try:
+            relative_path = os.path.relpath(original_abs, photos_abs)
+        except ValueError:
+            relative_path = None
+
+        if not relative_path or relative_path.startswith(".."):
+            outside_scope.append(original_abs)
+            continue
+
+        try:
+            embedding_array = np.array(embedding, dtype=np.float32)
+        except (TypeError, ValueError):
+            missing_metadata.append(face_id)
+            continue
+
+        face_record = dict(entry)
+        face_record["embedding"] = embedding_array
+        face_record["original_path"] = original_abs
+        prepared_faces.append(face_record)
+
+    if missing_metadata:
+        sample = next((mid for mid in missing_metadata if mid is not None), None)
+        detail = f" Example face id: {sample}" if sample is not None else ""
+        return render_template(
+            "reuse_faces.html",
+            status_message=(
+                "Error: Faces cache is missing embeddings or metadata for "
+                f"{len(missing_metadata)} face(s).{detail}"
+            ),
+            status_level="error",
+            **context,
+        )
+
+    if missing_photos:
+        sample = missing_photos[0]
+        return render_template(
+            "reuse_faces.html",
+            status_message=(
+                "Error: The cache references photo files that no longer exist. "
+                f"Example: {sample}"
+            ),
+            status_level="error",
+            **context,
+        )
+
+    if outside_scope:
+        sample = outside_scope[0]
+        return render_template(
+            "reuse_faces.html",
+            status_message=(
+                "Error: The cache references photo files outside the provided "
+                f"photo directory. Example: {sample}"
+            ),
+            status_level="error",
+            **context,
+        )
+
+    if not prepared_faces:
+        return render_template(
+            "reuse_faces.html",
+            status_message="Error: No valid faces remain after validation.",
+            status_level="error",
+            **context,
+        )
+
+    labels = processor.cluster_faces(
+        prepared_faces, eps=eps_value, min_samples=min_samples_value
+    )
+    if labels.size == 0:
+        return render_template(
+            "reuse_faces.html",
+            status_message="Error: No faces available for clustering.",
+            status_level="error",
+            **context,
+        )
+
+    clusters = {}
+    for face, label in zip(prepared_faces, labels):
+        cluster_id = int(label)
+        default_name = (
+            f"Person {cluster_id + 1}" if cluster_id != -1 else "Unidentified"
+        )
+        if cluster_id not in clusters:
+            clusters[cluster_id] = {
+                "cluster_id": cluster_id,
+                "name": default_name,
+                "faces": [],
+            }
+        clusters[cluster_id]["faces"].append({"face_id": face.get("face_id")})
+
+    if not clusters:
+        return render_template(
+            "reuse_faces.html",
+            status_message="Error: Clustering produced no groups.",
+            status_level="error",
+            **context,
+        )
+
+    output_dir, resolved_name = _resolve_output_directory(output_name_raw)
+    os.makedirs(output_dir, exist_ok=True)
+
+    try:
+        PhotoProcessor.save_final_albums(
+            list(clusters.values()), prepared_faces, output_dir
+        )
+    except Exception as exc:  # pylint: disable=broad-except
+        shutil.rmtree(output_dir, ignore_errors=True)
+        return render_template(
+            "reuse_faces.html",
+            status_message=f"Error: Failed to write grouped albums ({exc}).",
+            status_level="error",
+            **context,
+        )
+
+    cluster_count = len(clusters)
+    success_message = (
+        f"Grouped cached faces into {cluster_count} "
+        f"cluster{'s' if cluster_count != 1 else ''}."
+    )
+
+    return render_template(
+        "reuse_faces.html",
+        status_message=success_message,
+        status_level="success",
+        form_values={},
+        default_eps=PhotoProcessor.DEFAULT_CLUSTER_EPS,
+        default_min_samples=PhotoProcessor.DEFAULT_CLUSTER_MIN_SAMPLES,
+        output_directory=os.path.abspath(output_dir),
+        output_folder_name=resolved_name,
+        cluster_count=cluster_count,
+        face_count=len(prepared_faces),
+    )
 
 
 @app.route("/save_albums", methods=["POST"])

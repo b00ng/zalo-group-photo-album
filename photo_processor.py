@@ -17,6 +17,9 @@ EXIF_TAG_MAP = {v: k for k, v in ExifTags.TAGS.items() if isinstance(v, str)}
 
 
 class PhotoProcessor:
+    DEFAULT_CLUSTER_EPS = 0.5
+    DEFAULT_CLUSTER_MIN_SAMPLES = 2
+
     def __init__(self, output_path_base: str = "output_albums"):
         """
         Initializes the PhotoProcessor, loading the InsightFace model and setting up cache paths.
@@ -163,13 +166,20 @@ class PhotoProcessor:
         with open(self.faces_cache_file, "w") as cache_file:
             json.dump(serializable_faces, cache_file)
 
-    def cluster_faces(self, all_faces: List[dict], eps: float = 0.5) -> np.ndarray:
+    def cluster_faces(
+        self, all_faces: List[dict], eps: float = None, min_samples: int = None
+    ) -> np.ndarray:
         """Clusters faces based on their embeddings and returns the labels."""
         if not all_faces:
             return np.array([])
 
+        eps = eps or self.DEFAULT_CLUSTER_EPS
+        min_samples = min_samples or self.DEFAULT_CLUSTER_MIN_SAMPLES
+
         embeddings = np.array([face["embedding"] for face in all_faces])
-        clusterer = DBSCAN(metric="euclidean", eps=eps, min_samples=2)
+        clusterer = DBSCAN(
+            metric="euclidean", eps=eps, min_samples=min_samples
+        )
         clusterer.fit(embeddings)
         cluster_count = len(set(clusterer.labels_)) - (
             1 if -1 in clusterer.labels_ else 0

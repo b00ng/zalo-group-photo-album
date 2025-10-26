@@ -23,6 +23,7 @@
         <div class="nav-links">
             <a href="/">Cluster Discovery</a>
             <a href="/search">Search for Person</a>
+            <a href="/reuse_faces">Group Existing Faces</a>
             <a href="/timeline" class="active">Person Timelines</a>
             {% if google_auth_enabled and not is_authenticated %}
             <a href="{{ url_for('login', next=request.path) }}">Sign in with Google</a>

@@ -1,0 +1,127 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Group Existing Faces</title>
+    <link rel="stylesheet" href="/static/style.css">
+</head>
+<body>
+    <div class="container">
+        {% if google_user %}
+        <div class="user-bar">
+            {% if google_user.picture %}
+            <img src="{{ google_user.picture }}" alt="{{ google_user.name }}'s avatar" class="user-avatar">
+            {% endif %}
+            <div class="user-details">
+                <span class="user-name">{{ google_user.name }}</span>
+                <span class="user-email">{{ google_user.email }}</span>
+            </div>
+            <a href="{{ url_for('logout') }}" class="sign-out-link">Sign out</a>
+        </div>
+        {% endif %}
+
+        <div class="nav-links">
+            <a href="/">Cluster Discovery</a>
+            <a href="/search">Search for Person</a>
+            <a href="/reuse_faces" class="active">Group Existing Faces</a>
+            <a href="/timeline">Person Timelines</a>
+            {% if google_auth_enabled and not is_authenticated %}
+            <a href="{{ url_for('login', next=request.path) }}">Sign in with Google</a>
+            {% endif %}
+        </div>
+
+        <h1>Group Existing Faces</h1>
+        <p>Reuse a previously generated faces cache to rebuild grouped photo albums without scanning photos again.</p>
+
+        <form action="/run_reuse_faces" method="post">
+            <div class="form-group">
+                <label for="photos_path">1. Original Photos Folder:</label>
+                <input
+                    type="text"
+                    id="photos_path"
+                    name="photos_path"
+                    required
+                    placeholder="e.g., /home/user/pictures/event"
+                    value="{{ form_values.get('photos_path', '') }}"
+                >
+                <small class="input-hint">
+                    Provide the directory containing the source photos referenced by the cache.
+                </small>
+            </div>
+
+            <div class="form-group">
+                <label for="faces_path">2. Faces Cache Folder:</label>
+                <input
+                    type="text"
+                    id="faces_path"
+                    name="faces_path"
+                    required
+                    placeholder="e.g., /home/user/output_albums/.cache"
+                    value="{{ form_values.get('faces_path', '') }}"
+                >
+                <small class="input-hint">
+                    Must include <code>all_faces_data.json</code> plus the cropped face images.
+                </small>
+            </div>
+
+            <div class="form-group">
+                <label for="output_name">3. Output Folder Name (Optional):</label>
+                <input
+                    type="text"
+                    id="output_name"
+                    name="output_name"
+                    placeholder="Defaults to grouped_faces_<timestamp>"
+                    value="{{ form_values.get('output_name', '') }}"
+                >
+            </div>
+
+            <div class="form-group">
+                <label for="eps">4. Clustering Similarity (eps):</label>
+                <input
+                    type="number"
+                    id="eps"
+                    name="eps"
+                    min="0.01"
+                    step="0.01"
+                    placeholder="{{ default_eps }}"
+                    value="{{ form_values.get('eps', '') }}"
+                >
+                <small class="input-hint">
+                    Smaller values split clusters; defaults to {{ default_eps }} when left blank.
+                </small>
+            </div>
+
+            <div class="form-group">
+                <label for="min_samples">5. Minimum Samples:</label>
+                <input
+                    type="number"
+                    id="min_samples"
+                    name="min_samples"
+                    min="2"
+                    step="1"
+                    placeholder="{{ default_min_samples }}"
+                    value="{{ form_values.get('min_samples', '') }}"
+                >
+                <small class="input-hint">
+                    Higher numbers require more faces per cluster; defaults to {{ default_min_samples }}.
+                </small>
+            </div>
+
+            <button type="submit">Group Faces</button>
+        </form>
+
+        {% if status_message %}
+        <div class="status{% if status_level == 'success' %} status-success{% endif %}">
+            <h2>{{ 'Grouping Complete' if status_level == 'success' else 'Unable to Group' }}</h2>
+            <p>{{ status_message }}</p>
+            {% if status_level == 'success' %}
+            <p><strong>Output directory:</strong> {{ output_directory }}</p>
+            <p><strong>Clusters created:</strong> {{ cluster_count }}</p>
+            <p><strong>Faces processed:</strong> {{ face_count }}</p>
+            {% endif %}
+        </div>
+        {% endif %}
+    </div>
+</body>
+</html>
